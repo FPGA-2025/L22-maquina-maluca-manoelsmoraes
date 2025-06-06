@@ -2,9 +2,10 @@ module maquina_maluca (
     input  wire clk,
     input  wire rst_n,
     input  wire start,
-    output wire [3:0] state
+    output reg [3:0] state
 );
 
+    // Definição dos estados
     localparam IDLE                = 4'd1;
     localparam LIGAR_MAQUINA       = 4'd2;
     localparam VERIFICAR_AGUA      = 4'd3;
@@ -15,62 +16,64 @@ module maquina_maluca (
     localparam TAMPEAR             = 4'd8;
     localparam REALIZAR_EXTRACAO   = 4'd9;
 
-    reg [3:0] current_state, next_state;
     reg agua_enchida;
 
+    reg [3:0] next_state;
+
+    // Registro de estado com reset
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            current_state <= 4'd7;
-            agua_enchida  <= 1'b1;
+            state       <= IDLE;       // inicia em IDLE
+            agua_enchida <= 1'b0;      // reservatório vazio
         end else begin
-            current_state <= next_state;
+            state <= next_state;
 
-            if (current_state == ENCHER_RESERVATORIO)
-                agua_enchida <= 1'b0;
+            if (state == ENCHER_RESERVATORIO)
+                agua_enchida <= 1'b1; // depois de encher, fica cheio
         end
     end
 
-    // Lógica de próxima transição com erros
+    // Próximo estado
     always @(*) begin
-        case (current_state)
+        case(state)
             IDLE: begin
-                next_state = IDLE;
+                if (start == 1)
+                    next_state = LIGAR_MAQUINA;
+                else
+                    next_state = IDLE;
             end
 
             LIGAR_MAQUINA: 
-                next_state = MOER_CAFE;
+                next_state = VERIFICAR_AGUA;
 
             VERIFICAR_AGUA: begin
                 if (agua_enchida)
-                    next_state = ENCHER_RESERVATORIO;
-                else
                     next_state = MOER_CAFE;
+                else
+                    next_state = ENCHER_RESERVATORIO;
             end
 
             ENCHER_RESERVATORIO: 
-                next_state = COLOCAR_NO_FILTRO;
-
-            MOER_CAFE:         
-                next_state = MOER_CAFE;
-
-            COLOCAR_NO_FILTRO: 
-                next_state = REALIZAR_EXTRACAO;
-
-            PASSAR_AGITADOR:   
-                next_state = IDLE;
-
-            TAMPEAR:           
                 next_state = VERIFICAR_AGUA;
 
-            REALIZAR_EXTRACAO: 
+            MOER_CAFE:         
+                next_state = COLOCAR_NO_FILTRO;
+
+            COLOCAR_NO_FILTRO: 
+                next_state = PASSAR_AGITADOR;
+
+            PASSAR_AGITADOR:   
+                next_state = TAMPEAR;
+
+            TAMPEAR:           
                 next_state = REALIZAR_EXTRACAO;
 
+            REALIZAR_EXTRACAO: 
+                next_state = IDLE;
+
             default: 
-                next_state = MOER_CAFE;
+                next_state = IDLE;
         endcase
     end
-
-
-    assign state = current_state;
 
 endmodule
